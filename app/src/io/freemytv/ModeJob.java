@@ -14,7 +14,7 @@ import android.os.PersistableBundle;
  */
 public class ModeJob extends JobService {
     static final String APPLY = "apply", VERIFY = "verify", REVERT = "revert", MEMORY = "memory", REMOTE = "remote",
-            AMBIENT = "ambient", AMBIENT_RESTORE = "ambient-restore";
+            AMBIENT = "ambient", AMBIENT_RESTORE = "ambient-restore", SCREENSAVER = "screensaver";
 
     @Override public boolean onStartJob(JobParameters params) {
         PersistableBundle extras = params.getExtras();
@@ -31,6 +31,7 @@ public class ModeJob extends JobService {
                     case REMOTE: HomeMode.ensureRemoteServiceNow(app); break;
                     case AMBIENT: HomeMode.startOriginalAmbientNow(app); break;
                     case AMBIENT_RESTORE: HomeMode.restoreFreeDreamNow(app); break;
+                    case SCREENSAVER: HomeMode.applyScreensaverChoiceNow(app); break;
                     default: break;
                 }
             } catch (Throwable t) {

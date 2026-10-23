@@ -105,6 +105,11 @@ final class Prefs {
         return v.equals("moi-dark") || v.equals("moi-light");
     }
 
+    // The launcher and the idle background are separate choices. Keep the previous Free My TV saver unless the person
+    // explicitly selects the TV's own Ambient Mode from Settings.
+    static boolean originalScreensaver() { return sp().getString("screensaver", "freemytv").equals("original"); }
+    static void setOriginalScreensaver(boolean original) { put("screensaver", original ? "original" : "freemytv"); }
+
     // MARK: - City
 
     static String city() { return sp().getString("city", Config.CITY).trim(); }

@@ -113,7 +113,8 @@ public class SettingsActivity extends Activity {
     }
 
     static final class SettingsView extends View implements Choreographer.FrameCallback {
-        private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5;
+        private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5,
+                SCREENSAVER_CHOICE = 6;
         private static final float LIST_ROW_H = 68, LIST_ROW_GAP = 6;
         private static final int PICK_VISIBLE = 9;
         private static final float LIST_X = 1000, LIST_R = 1824, LIST_TOP = 186, ROW_GAP = 8, CHOICE_H = 104;
@@ -224,6 +225,14 @@ public class SettingsActivity extends Activity {
                     boolean inUse = (row == 0) == freeActive();
                     return name + (inUse ? Ui.tr(". In use") : "") + ", " + Ui.trf("{i} of {n}", "i", row + 1, "n", 2);
                 }
+                case SCREENSAVER_CHOICE: {
+                    boolean original = row == 0;
+                    String name = original ? Ui.tr("TV ambient mode") : "Free My TV";
+                    String detail = original ? Ui.tr("Google Photos or the screensaver set in TV Settings")
+                            : Ui.tr("Free My TV's clock and photo screensaver");
+                    return name + ", " + detail + (original == Prefs.originalScreensaver() ? Ui.tr(". In use") : "")
+                            + ", " + Ui.trf("{i} of {n}", "i", row + 1, "n", 2);
+                }
                 case HOME_SETTINGS:
                 case REMOTE_KEYS: {
                     boolean keys = screen == REMOTE_KEYS;
@@ -258,7 +267,7 @@ public class SettingsActivity extends Activity {
             if (screen == MAIN) {
                 top = MAIN_TOP + row * (ROW_H + MAIN_GAP);
                 height = ROW_H;
-            } else if (screen == HOME_CHOICE) {
+            } else if (screen == HOME_CHOICE || screen == SCREENSAVER_CHOICE) {
                 top = LIST_TOP + 20 + row * (CHOICE_H + ROW_GAP);
                 height = CHOICE_H;
             } else {
@@ -342,7 +351,8 @@ public class SettingsActivity extends Activity {
         private int rowCount() {
             switch (screen) {
                 case MAIN: return 7;
-                case HOME_CHOICE: return 2;
+                case HOME_CHOICE:
+                case SCREENSAVER_CHOICE: return 2;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
@@ -374,7 +384,9 @@ public class SettingsActivity extends Activity {
             c.drawText(Ui.tr("Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
             c.drawText(versionName(getContext()), cx, 704 * k, version);
 
-            if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
+            if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c);
+            else if (screen == SCREENSAVER_CHOICE) drawScreensaverChoice(c); else if (screen == PICKER) drawPicker(c);
+            else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
         }
 
         private void drawMain(Canvas c, float seconds) {
@@ -384,7 +396,8 @@ public class SettingsActivity extends Activity {
             String[] labels = {Ui.tr("Home Screen"), Ui.tr("Screensaver"),
                     Ui.tr("Home Settings"), Ui.tr("Shelf"), Ui.tr("Top Buttons"),
                     Ui.tr("Remote Buttons"), Ui.tr("TV Settings")};
-            String[] values = {working ? "" : mode, Ui.tr("Preview"), "", "", "", "", ""};
+            String[] values = {working ? "" : mode,
+                    Prefs.originalScreensaver() ? Ui.tr("TV ambient mode") : "Free My TV", "", "", "", "", ""};
             for (int i = 0; i < labels.length; i++) {
                 float y = (MAIN_TOP + i * (ROW_H + MAIN_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
@@ -540,6 +553,32 @@ public class SettingsActivity extends Activity {
                     (LIST_TOP + 20 + 2 * (CHOICE_H + ROW_GAP) + 40) * k, hint);
         }
 
+        /** Independent idle-background choice: the TV's own Ambient Mode (usually Google Photos) or our saver. */
+        private void drawScreensaverChoice(Canvas c) {
+            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
+            c.drawText(Ui.tr("Screensaver"), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
+            String[][] options = {{Ui.tr("TV ambient mode"), Ui.tr("Google Photos or the screensaver set in TV Settings")},
+                    {"Free My TV", Ui.tr("Clock and photo screensaver")}};
+            int current = Prefs.originalScreensaver() ? 0 : 1;
+            for (int i = 0; i < options.length; i++) {
+                float y = (LIST_TOP + 20 + i * (CHOICE_H + ROW_GAP)) * k;
+                rowRect.set(LIST_X * k, y, LIST_R * k, y + CHOICE_H * k);
+                float f = drawRowBackground(c, i);
+                rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
+                rowSub.setColor(blend(0x8CFFFFFF, 0x991C1C1E, f));
+                c.drawText(options[i][0], rowRect.left + 30 * k, rowRect.top + 44 * k, rowLabel);
+                c.drawText(options[i][1], rowRect.left + 30 * k, rowRect.top + 80 * k, rowSub);
+                if (i == current) {
+                    float cw = Symbols.width(getContext(), "check", 26 * k);
+                    Symbols.draw(getContext(), c, "check", rowRect.right - 30 * k - cw / 2, rowRect.centerY(), 26 * k,
+                            blend(0xFFFFFFFF, INK, f));
+                }
+            }
+            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            c.drawText(Ui.tr("The TV's Settings choose the idle delay and Google Photos album."), LIST_X * k + 30 * k,
+                    (LIST_TOP + 20 + 2 * (CHOICE_H + ROW_GAP) + 40) * k, hint);
+        }
+
         private static int blend(int a, int b, float f) {
             int aa = a >>> 24, ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
             int ba = b >>> 24, br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
@@ -619,7 +658,7 @@ public class SettingsActivity extends Activity {
                                 focus = pickFor - 1;
                                 screen = REMOTE_KEYS;
                             } else {
-                                focus = screen == HOME_SETTINGS ? 2 : screen == SHELF_EDIT ? (editingTop ? 4 : 3)
+                                focus = screen == HOME_SETTINGS ? 2 : screen == SCREENSAVER_CHOICE ? 1 : screen == SHELF_EDIT ? (editingTop ? 4 : 3)
                                         : screen == REMOTE_KEYS ? 5 : 0;
                                 screen = MAIN;
                             }
@@ -1000,6 +1039,15 @@ public class SettingsActivity extends Activity {
                 }
                 screen = MAIN;
                 focus = 0;
+            } else if (screen == SCREENSAVER_CHOICE) {
+                boolean original = focus == 0;
+                if (Prefs.originalScreensaver() != original) {
+                    Prefs.setOriginalScreensaver(original);
+                    HomeMode.requestScreensaver(c);
+                    pendingAt = SystemClock.uptimeMillis();
+                }
+                screen = MAIN;
+                focus = 1;
             } else if (screen == PICKER && pickFor == PICK_CITY) {
                 String[] city = cities.get(pickScroll + focus);
                 Prefs.setCity(city[1], city[2], city[3]);
@@ -1035,8 +1083,8 @@ public class SettingsActivity extends Activity {
                 screen = HOME_CHOICE;
                 focus = freeActive() ? 0 : 1;
             } else if (focus == 1) {
-                pause();
-                activity.showPreview();
+                screen = SCREENSAVER_CHOICE;
+                focus = Prefs.originalScreensaver() ? 0 : 1;
             } else if (focus == 2) {
                 screen = HOME_SETTINGS;
                 focus = 0;

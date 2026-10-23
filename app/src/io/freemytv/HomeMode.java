@@ -196,9 +196,43 @@ final class HomeMode {
         if (FREE.equals(state(c).optString("mode"))) ModeJob.schedule(c, ModeJob.AMBIENT, null, 0);
     }
 
+    /** Applies the independent Ambient Mode choice from Settings without changing the selected home screen. */
+    static void requestScreensaver(Context c) {
+        ModeJob.schedule(c, ModeJob.SCREENSAVER, null, 0);
+    }
+
     /** Called when the ambient dream closes, before Free My TV checks its mode again. */
     static void restoreFreeDreamAfterAmbient(Context c) {
         if (state(c).optBoolean("ambientOriginal")) ModeJob.schedule(c, ModeJob.AMBIENT_RESTORE, null, 0);
+    }
+
+    /** Selects either the TV's original Ambient Mode or Free My TV's own saver, and keeps idle ambient enabled. */
+    static void applyScreensaverChoiceNow(Context app) {
+        synchronized (RUN) {
+            JSONObject s = state(app);
+            if (!FREE.equals(s.optString("mode"))) return;
+            try (Adb adb = connect(app, s)) {
+                if (usesSystemAmbient()) {
+                    String dream = originalDream(s);
+                    if (dream.isEmpty()) dream = defaultDream(adb);
+                    String pkg = packageOf(dream);
+                    if (pkg == null || pkg.equals(PKG)) {
+                        notice(app, Ui.tr("The TV's original ambient mode was not recorded yet."));
+                        return;
+                    }
+                    adb.shell("pm enable " + pkg);
+                    adb.shell("settings put secure screensaver_components " + dream);
+                    s.put("originalDream", dream);
+                } else {
+                    adb.shell("settings put secure screensaver_components " + DREAM);
+                }
+                // This only enables Ambient Mode; the TV's own Settings still decide how many idle minutes it waits.
+                adb.shell("settings put secure screensaver_enabled 1");
+                save(app, s);
+            } catch (Exception e) {
+                notice(app, Ui.trf("Couldn't change the screensaver: {error}", "error", e.getMessage()));
+            }
+        }
     }
 
     /** After the TV boots (and after a TV update): wait for the system to settle and check Free My TV mode. */
@@ -240,6 +274,12 @@ final class HomeMode {
             JSONObject s = state(app);
             if (!FREE.equals(s.optString("mode"))) return;
             try (Adb adb = connect(app, s)) {
+                // Back from Moi previews whichever idle background the person selected in Settings.
+                if (!usesSystemAmbient()) {
+                    adb.shell("settings put secure screensaver_components " + DREAM);
+                    adb.shell("cmd dream start-dream");
+                    return;
+                }
                 // Some TVs only expose their Ambient/Google Photos component as the system default.  This is common
                 // when Free My TV was installed after the first setup, so no earlier mode switch could record it.
                 String dream = originalDream(s);
@@ -372,21 +412,25 @@ final class HomeMode {
             Watchdog.clear(c);
             check(adb.shell("cmd package set-home-activity " + HOME_ACTIVITY), "Success",
                     Ui.tr("Android didn't accept the new home screen"));
-            // Moi uses the TV's Ambient Mode (such as Google Photos).  The launcher and the screensaver are independent,
-            // so don't replace an intentional system choice while enabling the Moi home screen.
             if (!usesSystemAmbient()) adb.shell("settings put secure screensaver_components " + DREAM);
             JSONObject started = state(c);
             started.put("mode", FREE).put("homeReverted", false).put("setupHome", setupHome);
             save(c, started);
-            List<String> targets = targets(home, dream, setupHome);
+            // A system Ambient Mode is a first-class user choice.  Do not include its service in the apps to disable.
+            List<String> targets = targets(home, usesSystemAmbient() ? "" : dream, setupHome);
             Set<String> disabled = new HashSet<>(stringList(state(c), "disabled"));
             Set<String> present = packages(adb, "");
+            String ambientPkg = usesSystemAmbient() ? packageOf(dream) : null;
+            if (ambientPkg != null && present.contains(ambientPkg)) {
+                adb.shell("pm enable " + ambientPkg);
+                disabled.remove(ambientPkg);
+            }
             Set<String> keptOff = new HashSet<>(stringList(state(c), "keptOff"));
             // Off now and not on our list: the person turned it off, unless an earlier install of Free My TV did (its
             // list lives in the TV's settings too, since an uninstall erases our state file).
             Set<String> ours = recorded(adb);
             for (String pkg : packages(adb, "-d")) {
-                if (targets(home, dream, true).contains(pkg) && !disabled.contains(pkg) && !ours.contains(pkg)) keptOff.add(pkg);
+                if (targets(home, usesSystemAmbient() ? "" : dream, true).contains(pkg) && !disabled.contains(pkg) && !ours.contains(pkg)) keptOff.add(pkg);
             }
             keptOff.removeAll(ours);
             JSONObject before = state(c);
@@ -626,16 +670,24 @@ final class HomeMode {
                 }
                 Set<String> wanted = new HashSet<>(stringList(s, "disabled"));
                 String dream = originalDream(s);
+                if (dream.isEmpty() && usesSystemAmbient()) dream = defaultDream(adb);
+                String ambientPkg = usesSystemAmbient() ? packageOf(dream) : null;
                 // In the switch's order (Google TV's setup app before its home screen), then the rest.
                 List<String> order = new ArrayList<>();
-                for (String pkg : targets(home, dream, s.optBoolean("setupHome", true))) {
+                for (String pkg : targets(home, usesSystemAmbient() ? "" : dream, s.optBoolean("setupHome", true))) {
                     if (!reverted || !(pkg.equals(homePkg) || pkg.equals(GOOGLE_SETUP) || pkg.equals(packageOf(dream)))) {
                         wanted.add(pkg);
                         order.add(pkg);
                     }
                 }
+                if (ambientPkg != null) wanted.remove(ambientPkg);
                 for (String pkg : sorted(wanted)) if (!order.contains(pkg)) order.add(pkg);
                 Set<String> disabled = new HashSet<>(stringList(s, "disabled"));
+                if (ambientPkg != null && present.contains(ambientPkg)) {
+                    adb.shell("pm enable " + ambientPkg);
+                    disabledNow.remove(ambientPkg);
+                    disabled.remove(ambientPkg);
+                }
                 // Off before Free My TV: turned off again if a TV update brings one back, but never handed to
                 // Original to turn on.
                 List<String> keptOff = stringList(s, "keptOff");
@@ -683,7 +735,7 @@ final class HomeMode {
                     fixed.add(Ui.tr("the home screen"));
                 }
                 // Whole component names: ".ScreensaverAlone" (Android 11) contains ".Screensaver" (12 and newer).
-                // In Moi, ambient mode is owned by Android TV so Google Photos remains the user's selection.
+                // The user's Ambient Mode choice is independent from their selected launcher theme.
                 if (!reverted && !usesSystemAmbient()
                         && !Arrays.asList(adb.shell("settings get secure screensaver_components").trim().split(",")).contains(DREAM)) {
                     adb.shell("settings put secure screensaver_components " + DREAM);
@@ -788,9 +840,9 @@ final class HomeMode {
         return safeComponent(s.optString("originalDream", ""));
     }
 
-    /** Moi is a launcher redesign; its ambient background is intentionally managed in the TV's own settings. */
+    /** The launcher theme never decides the idle background: Settings does. */
     private static boolean usesSystemAmbient() {
-        return Prefs.moiTheme();
+        return Prefs.originalScreensaver();
     }
 
     // Nested classes ("Outer$Inner") are valid; every shell command that takes one quotes it, so $ stays literal.
