@@ -157,7 +157,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final List<HomeApps.Item> lightButtons = new ArrayList<>();
     private Paint lTitle, lTab, lTabOn, lCardTitle, lCardMeta, lQuote, lTip, lDate, lClock, lWeather, lClockQuote;
     private Paint moiTime, moiDate, moiSection;
-    private TextPaint moiAppLabel;
     private Shader lightGradient;
 
     // Shelf
@@ -628,8 +627,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         moiTime = Ui.numbers(Ui.semibold, 46 * k, 0xFFF7FAFF);
         moiDate = Ui.text(Ui.medium, 25 * k, 0xB9CBD5E9);
         moiSection = Ui.text(Ui.semibold, 30 * k, 0xFFF4F7FC);
-        moiAppLabel = new TextPaint(Ui.text(Ui.medium, 23 * k, 0xDCE8F1FF));
-        moiAppLabel.setTextAlign(Paint.Align.CENTER);
         lightGradient = null;
         buttonPaint = Ui.text(Ui.semibold, 29 * k, INK);
         capsuleText = Ui.numbers(Ui.medium, 29 * k, 0xF2FFFFFF);
@@ -1456,13 +1453,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         border.setStrokeWidth((1.15f + 1.1f * f) * k);
         c.drawRoundRect(cell, radius, radius, border);
         border.setStrokeWidth(2 * k);
-        if (f > .01f) {
-            String label = TextUtils.ellipsize(it.label, moiAppLabel, base.width() + 12 * k, TextUtils.TruncateAt.END).toString();
-            moiAppLabel.setColor(Ui.alpha(moiPrimary(), f));
-            // Leave visible air before the next cell.  The old baseline consumed the entire label lane when focused,
-            // making "Apple TV" appear attached to the All Apps tile below it.
-            c.drawText(label, base.centerX(), base.bottom + (18 + 2 * f) * k, moiAppLabel);
-        }
+        // The lift, shadow and bright glass rim are the entire focus affordance.  A label underneath turns a compact
+        // app grid into an uneven list and competes with the next row, especially on 1080p TVs.
     }
 
     /**
