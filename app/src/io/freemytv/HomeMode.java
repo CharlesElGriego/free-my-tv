@@ -206,7 +206,7 @@ final class HomeMode {
         if (state(c).optBoolean("ambientOriginal")) ModeJob.schedule(c, ModeJob.AMBIENT_RESTORE, null, 0);
     }
 
-    /** Selects either the TV's original Ambient Mode or Free My TV's own saver, and keeps idle ambient enabled. */
+    /** Selects either the TV's original Ambient Mode or Free My TV's own saver, enables idle ambient, then previews it. */
     static void applyScreensaverChoiceNow(Context app) {
         synchronized (RUN) {
             JSONObject s = state(app);
@@ -229,6 +229,8 @@ final class HomeMode {
                 // This only enables Ambient Mode; the TV's own Settings still decide how many idle minutes it waits.
                 adb.shell("settings put secure screensaver_enabled 1");
                 save(app, s);
+                String result = adb.shell("cmd dream start-dream").trim();
+                if (!result.isEmpty()) AppLog.w("screensaver preview: " + result);
             } catch (Exception e) {
                 notice(app, Ui.trf("Couldn't change the screensaver: {error}", "error", e.getMessage()));
             }

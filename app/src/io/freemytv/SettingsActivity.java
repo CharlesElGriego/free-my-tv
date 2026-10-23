@@ -1043,9 +1043,11 @@ public class SettingsActivity extends Activity {
                 boolean original = focus == 0;
                 if (Prefs.originalScreensaver() != original) {
                     Prefs.setOriginalScreensaver(original);
-                    HomeMode.requestScreensaver(c);
-                    pendingAt = SystemClock.uptimeMillis();
                 }
+                // Selecting it is also a safe immediate preview: the owner can verify Google Photos (or ours) before
+                // waiting for Android TV's idle timer. Selecting the already checked option previews it again.
+                HomeMode.requestScreensaver(c);
+                pendingAt = SystemClock.uptimeMillis();
                 screen = MAIN;
                 focus = 1;
             } else if (screen == PICKER && pickFor == PICK_CITY) {
