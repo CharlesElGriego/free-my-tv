@@ -229,7 +229,7 @@ final class HomeMode {
                 // This only enables Ambient Mode; the TV's own Settings still decide how many idle minutes it waits.
                 adb.shell("settings put secure screensaver_enabled 1");
                 save(app, s);
-                String result = adb.shell("cmd dream start-dream").trim();
+                String result = startDream(adb);
                 if (!result.isEmpty()) AppLog.w("screensaver preview: " + result);
             } catch (Exception e) {
                 notice(app, Ui.trf("Couldn't change the screensaver: {error}", "error", e.getMessage()));
@@ -279,7 +279,7 @@ final class HomeMode {
                 // Back from Moi previews whichever idle background the person selected in Settings.
                 if (!usesSystemAmbient()) {
                     adb.shell("settings put secure screensaver_components " + DREAM);
-                    adb.shell("cmd dream start-dream");
+                    startDream(adb);
                     return;
                 }
                 // Some TVs only expose their Ambient/Google Photos component as the system default.  This is common
@@ -299,7 +299,7 @@ final class HomeMode {
                 }
                 adb.shell("pm enable " + pkg);
                 adb.shell("settings put secure screensaver_components " + dream);
-                String result = adb.shell("cmd dream start-dream").trim();
+                String result = startDream(adb);
                 if (!result.isEmpty()) AppLog.w("original ambient start: " + result);
                 s.put("ambientOriginal", true);
                 save(app, s);
@@ -840,6 +840,15 @@ final class HomeMode {
 
     private static String originalDream(JSONObject s) {
         return safeComponent(s.optString("originalDream", ""));
+    }
+
+    /** Android's DreamManager shell service is named "dreams" (plural); a few older vendor builds kept the old name. */
+    private static String startDream(Adb adb) throws IOException {
+        String result = adb.shell("cmd dreams start-dreaming").trim();
+        if (result.contains("Can't find service") || result.contains("Unknown command")) {
+            result = adb.shell("cmd dream start-dream").trim();
+        }
+        return result;
     }
 
     /** The launcher theme never decides the idle background: Settings does. */
