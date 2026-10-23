@@ -842,13 +842,23 @@ final class HomeMode {
         return safeComponent(s.optString("originalDream", ""));
     }
 
-    /** Android's DreamManager shell service is named "dreams" (plural); a few older vendor builds kept the old name. */
+    /**
+     * Starts the selected Dream across Android TV generations. Newer builds expose DreamManager as `cmd dreams`;
+     * older Sony/Android TV builds expose the same system action through SystemUI's Somnambulator activity. A handful
+     * of vendor images keep the pre-standard `cmd dream` alias as a final fallback.
+     */
     private static String startDream(Adb adb) throws IOException {
         String result = adb.shell("cmd dreams start-dreaming").trim();
-        if (result.contains("Can't find service") || result.contains("Unknown command")) {
-            result = adb.shell("cmd dream start-dream").trim();
-        }
+        if (!dreamCommandUnavailable(result)) return result;
+        result = adb.shell("am start -n com.android.systemui/.Somnambulator").trim();
+        if (!result.contains("Error type") && !result.contains("does not exist")) return result;
+        result = adb.shell("cmd dream start-dream").trim();
         return result;
+    }
+
+    private static boolean dreamCommandUnavailable(String result) {
+        return result.contains("No shell command implementation") || result.contains("Can't find service")
+                || result.contains("Unknown command");
     }
 
     /** The launcher theme never decides the idle background: Settings does. */
