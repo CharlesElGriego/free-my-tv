@@ -1,3 +1,13 @@
+## Charles’ Cleaner TV UI
+
+My personal Android TV dashboard layout: a cleaner app grid, weather, inputs, device notifications, and Google Photos ambient mode.
+
+<img width="1920" height="1080" alt="Cleaner TV UI — dark theme" src="https://github.com/user-attachments/assets/cd55ecd0-dbab-4107-885b-71efe5b32971" />
+
+<img width="1920" height="1080" alt="Cleaner TV UI — light theme" src="https://github.com/user-attachments/assets/4a11752b-53a8-490a-94c0-ae5d924ffa39" />
+
+> This is my personal configuration and visual direction for Free My TV.
+
 <div align="center">
 
 <img src="docs/assets/icon-512.png" width="96" alt="">
