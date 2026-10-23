@@ -267,13 +267,13 @@ final class HomeMode {
         }
     }
 
-    /** Returns the configured Free My TV dream after the user dismisses the original ambient mode. */
+    /** Returns Free My TV's dream after ambient mode, except Moi deliberately leaves the TV's own ambient choice alone. */
     static void restoreFreeDreamNow(Context app) {
         synchronized (RUN) {
             JSONObject s = state(app);
             if (!s.optBoolean("ambientOriginal") || !FREE.equals(s.optString("mode"))) return;
             try (Adb adb = connect(app, s)) {
-                adb.shell("settings put secure screensaver_components " + DREAM);
+                if (!usesSystemAmbient()) adb.shell("settings put secure screensaver_components " + DREAM);
                 s.remove("ambientOriginal");
                 save(app, s);
             } catch (Exception e) {
@@ -372,7 +372,9 @@ final class HomeMode {
             Watchdog.clear(c);
             check(adb.shell("cmd package set-home-activity " + HOME_ACTIVITY), "Success",
                     Ui.tr("Android didn't accept the new home screen"));
-            adb.shell("settings put secure screensaver_components " + DREAM);
+            // Moi uses the TV's Ambient Mode (such as Google Photos).  The launcher and the screensaver are independent,
+            // so don't replace an intentional system choice while enabling the Moi home screen.
+            if (!usesSystemAmbient()) adb.shell("settings put secure screensaver_components " + DREAM);
             JSONObject started = state(c);
             started.put("mode", FREE).put("homeReverted", false).put("setupHome", setupHome);
             save(c, started);
@@ -681,7 +683,9 @@ final class HomeMode {
                     fixed.add(Ui.tr("the home screen"));
                 }
                 // Whole component names: ".ScreensaverAlone" (Android 11) contains ".Screensaver" (12 and newer).
-                if (!reverted && !Arrays.asList(adb.shell("settings get secure screensaver_components").trim().split(",")).contains(DREAM)) {
+                // In Moi, ambient mode is owned by Android TV so Google Photos remains the user's selection.
+                if (!reverted && !usesSystemAmbient()
+                        && !Arrays.asList(adb.shell("settings get secure screensaver_components").trim().split(",")).contains(DREAM)) {
                     adb.shell("settings put secure screensaver_components " + DREAM);
                     fixed.add(Ui.tr("the screensaver"));
                 }
@@ -782,6 +786,11 @@ final class HomeMode {
 
     private static String originalDream(JSONObject s) {
         return safeComponent(s.optString("originalDream", ""));
+    }
+
+    /** Moi is a launcher redesign; its ambient background is intentionally managed in the TV's own settings. */
+    private static boolean usesSystemAmbient() {
+        return Prefs.moiTheme();
     }
 
     // Nested classes ("Outer$Inner") are valid; every shell command that takes one quotes it, so $ stays literal.
