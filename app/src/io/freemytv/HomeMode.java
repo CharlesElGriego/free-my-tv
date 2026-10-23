@@ -191,6 +191,16 @@ final class HomeMode {
         ModeJob.schedule(c, ModeJob.REVERT, null, 0);
     }
 
+    /** Starts the TV's recorded Ambient Mode from the root of Moi; its original dream is restored when Home resumes. */
+    static void requestOriginalAmbient(Context c) {
+        if (FREE.equals(state(c).optString("mode"))) ModeJob.schedule(c, ModeJob.AMBIENT, null, 0);
+    }
+
+    /** Called when the ambient dream closes, before Free My TV checks its mode again. */
+    static void restoreFreeDreamAfterAmbient(Context c) {
+        if (state(c).optBoolean("ambientOriginal")) ModeJob.schedule(c, ModeJob.AMBIENT_RESTORE, null, 0);
+    }
+
     /** After the TV boots (and after a TV update): wait for the system to settle and check Free My TV mode. */
     static void bootCheck(Context c) {
         ensureRemoteService(c, 30_000);
@@ -217,6 +227,48 @@ final class HomeMode {
             remoteService(app, adb, true);
         } catch (IOException e) {
             AppLog.w("remote buttons service: " + e.getMessage());
+        }
+    }
+
+    /**
+     * The original dream was recorded before Free My TV took over.  It is normally disabled in Free mode, so re-enable
+     * only that package, select its validated component, and ask Android's DreamManager to start it.  This never
+     * changes the Home role or Google Photos account; when the dream is dismissed, HomeActivity restores our dream.
+     */
+    static void startOriginalAmbientNow(Context app) {
+        synchronized (RUN) {
+            JSONObject s = state(app);
+            if (!FREE.equals(s.optString("mode"))) return;
+            String dream = originalDream(s);
+            String pkg = packageOf(dream);
+            if (pkg == null || pkg.equals(PKG)) {
+                notice(app, Ui.tr("The TV's original ambient mode was not recorded yet."));
+                return;
+            }
+            try (Adb adb = connect(app, s)) {
+                adb.shell("pm enable " + pkg);
+                adb.shell("settings put secure screensaver_components " + dream);
+                adb.shell("cmd dream start-dream");
+                s.put("ambientOriginal", true);
+                save(app, s);
+            } catch (Exception e) {
+                notice(app, Ui.trf("Couldn't start the original ambient mode: {error}", "error", e.getMessage()));
+            }
+        }
+    }
+
+    /** Returns the configured Free My TV dream after the user dismisses the original ambient mode. */
+    static void restoreFreeDreamNow(Context app) {
+        synchronized (RUN) {
+            JSONObject s = state(app);
+            if (!s.optBoolean("ambientOriginal") || !FREE.equals(s.optString("mode"))) return;
+            try (Adb adb = connect(app, s)) {
+                adb.shell("settings put secure screensaver_components " + DREAM);
+                s.remove("ambientOriginal");
+                save(app, s);
+            } catch (Exception e) {
+                AppLog.w("could not restore Free My TV screensaver after ambient mode: " + e.getMessage());
+            }
         }
     }
 

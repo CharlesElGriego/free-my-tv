@@ -176,6 +176,18 @@ It's your code, and Claude Code finds its way around it. Try:
 - *"Add Catalan."*
 - *"Switch to the night look an hour after sunset."*
 
+### Moi dashboard themes
+
+**Moi Dark** and **Moi Light** are two permanent dashboard themes for people who prefer a launchpad to the standard
+editorial home screen. Pick either in *Free My TV → Home Settings → Theme*.
+
+- **Moi Dark** uses a deep blue-smoke glass surface with warm-white focus, intended for a dim room.
+- **Moi Light** uses translucent milky glass, ink-blue type and a blue focus ring, intended for a bright room.
+
+Both keep the same remote navigation: weather and the next six hours on the left, a fixed 5-column app grid on the
+right, inputs below, and Settings, Notifications and TV Settings in the upper-right. A focused app rises, gains a
+clear rim and reveals its name; labels have their own vertical lane so they never collide with the next row.
+
 ## How it works
 
 - **A plain Android app, no Gradle, no libraries.** [`build.sh`](build.sh) runs aapt2 → javac → d8 → zipalign → apksigner and makes a 2 MB APK.

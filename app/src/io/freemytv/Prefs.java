@@ -88,13 +88,22 @@ final class Prefs {
 
     static void setTemperature(String v) { put("temperature", v); }
 
-    /** "auto" (dark from sunset to sunrise), "light" or "dark". */
+    /** Automatic, the original light/dark looks, or either permanent Moi dashboard palette. */
     static String theme() {
         String v = sp().getString("theme", "auto");
-        return v.equals("light") || v.equals("dark") ? v : "auto";
+        // Builds from the first Moi prototype stored this short value.  Keep every existing TV on the intended dark
+        // dashboard while exposing an explicit pair of choices from now on.
+        if (v.equals("moi")) return "moi-dark";
+        return v.equals("light") || v.equals("dark") || v.equals("moi-dark") || v.equals("moi-light") ? v : "auto";
     }
 
     static void setTheme(String v) { put("theme", v); }
+
+    /** True for either Moi palette; use this rather than comparing a concrete palette in layout behavior. */
+    static boolean moiTheme() {
+        String v = theme();
+        return v.equals("moi-dark") || v.equals("moi-light");
+    }
 
     // MARK: - City
 

@@ -636,7 +636,7 @@ public class SettingsActivity extends Activity {
 
         // MARK: - Home Settings and Remote Buttons
 
-        private static final String[] UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
+        private static final String[] UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark", "moi-dark", "moi-light"};
         /** Home Settings: language, temperature, theme, sounds, weather, city, quotes, then one row per coin. */
         private static final int CITY_ROW = 5, COIN_ROWS = 7;
 
@@ -668,7 +668,9 @@ public class SettingsActivity extends Activity {
             String unit = Prefs.temperature();
             v[1] = unit.equals("C") ? "°C" : unit.equals("F") ? "°F" : Ui.tr("unit|Automatic");
             String theme = Prefs.theme();
-            v[2] = theme.equals("light") ? Ui.tr("Light") : theme.equals("dark") ? Ui.tr("Dark") : Ui.tr("Automatic");
+            v[2] = theme.equals("light") ? Ui.tr("Light") : theme.equals("dark") ? Ui.tr("Dark")
+                    : theme.equals("moi-dark") ? "Moi Dark" : theme.equals("moi-light") ? "Moi Light"
+                    : Ui.tr("Automatic");
             v[3] = onOff(Prefs.sounds());
             v[4] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
@@ -869,7 +871,7 @@ public class SettingsActivity extends Activity {
         private void toggleShelfApp() {
             String pkg = shelfRows.get(pickScroll + focus)[0];
             if (shelfOrder.contains(pkg)) shelfOrder.remove(pkg);
-            else if (editingTop || shelfOrder.size() < HomeApps.MAX_SHELF) shelfOrder.add(pkg);   // three buttons: no limit to reach
+            else if (editingTop || shelfOrder.size() < HomeApps.shelfLimit()) shelfOrder.add(pkg);   // three buttons: no limit to reach
             else return;
             refreshShelfRows(pkg);
         }
@@ -903,7 +905,7 @@ public class SettingsActivity extends Activity {
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
             float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
             c.drawText(editingTop ? Ui.tr("OK adds or removes a button. ← → change the order.")
-                    : Ui.trf("OK adds or removes (up to {n}). ← → change the order.", "n", HomeApps.MAX_SHELF),
+                    : Ui.trf("OK adds or removes (up to {n}). ← → change the order.", "n", HomeApps.shelfLimit()),
                     LIST_X * k + 30 * k, hy, hint);
         }
 
