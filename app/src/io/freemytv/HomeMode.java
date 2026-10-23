@@ -239,16 +239,26 @@ final class HomeMode {
         synchronized (RUN) {
             JSONObject s = state(app);
             if (!FREE.equals(s.optString("mode"))) return;
-            String dream = originalDream(s);
-            String pkg = packageOf(dream);
-            if (pkg == null || pkg.equals(PKG)) {
-                notice(app, Ui.tr("The TV's original ambient mode was not recorded yet."));
-                return;
-            }
             try (Adb adb = connect(app, s)) {
+                // Some TVs only expose their Ambient/Google Photos component as the system default.  This is common
+                // when Free My TV was installed after the first setup, so no earlier mode switch could record it.
+                String dream = originalDream(s);
+                if (dream.isEmpty()) {
+                    dream = defaultDream(adb);
+                    if (!dream.isEmpty()) {
+                        s.put("originalDream", dream);
+                        save(app, s);
+                    }
+                }
+                String pkg = packageOf(dream);
+                if (pkg == null || pkg.equals(PKG)) {
+                    notice(app, Ui.tr("The TV's original ambient mode was not recorded yet."));
+                    return;
+                }
                 adb.shell("pm enable " + pkg);
                 adb.shell("settings put secure screensaver_components " + dream);
-                adb.shell("cmd dream start-dream");
+                String result = adb.shell("cmd dream start-dream").trim();
+                if (!result.isEmpty()) AppLog.w("original ambient start: " + result);
                 s.put("ambientOriginal", true);
                 save(app, s);
             } catch (Exception e) {
